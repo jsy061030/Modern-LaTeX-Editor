@@ -3,6 +3,10 @@
 // Env flags (evaluated at module load)
 const WASM_MODULE = import.meta.env.VITE_WASM_LATEX_MODULE; // optional ESM module id or URL
 
+let pdfTexEngineInstance = null;
+let pdfTexEngineReadyPromise = null;
+let pdfTexCompileQueue = Promise.resolve();
+
 const escapeHtml = (text) => {
   return String(text)
     .replace(/&/g, '&amp;')
@@ -855,11 +859,69 @@ const summarizeLatexLog = (log) => {
   return '';
 };
 
+const getBrowserGlobal = () => {
+  if (typeof window !== 'undefined') return window;
+  return {};
+};
+
+const getPdfTexEngineCtor = () => {
+  const g = getBrowserGlobal();
+  return typeof g.PdfTeXEngine === 'function' ? g.PdfTeXEngine : null;
+};
+
+const waitForPdfTexReady = async (engine, timeoutMs = 30000) => {
+  if (!engine || typeof engine.isReady !== 'function') return;
+  if (engine.isReady()) return;
+  const started = Date.now();
+  while (!engine.isReady()) {
+    if (Date.now() - started > timeoutMs) {
+      throw new Error('WASM engine is taking too long to become ready.');
+    }
+    await new Promise((resolve) => setTimeout(resolve, 60));
+  }
+};
+
+const getOrLoadPdfTexEngine = async () => {
+  if (pdfTexEngineInstance) return pdfTexEngineInstance;
+
+  const PdfTeXEngineCtor = getPdfTexEngineCtor();
+  if (!PdfTeXEngineCtor) return null;
+
+  if (!pdfTexEngineReadyPromise) {
+    pdfTexEngineReadyPromise = (async () => {
+      const engine = new PdfTeXEngineCtor();
+      await engine.loadEngine();
+      pdfTexEngineInstance = engine;
+      return engine;
+    })().catch((error) => {
+      pdfTexEngineReadyPromise = null;
+      pdfTexEngineInstance = null;
+      throw error;
+    });
+  }
+
+  return pdfTexEngineReadyPromise;
+};
+
+const enqueuePdfTexCompile = async (task) => {
+  const run = pdfTexCompileQueue.then(task, task);
+  pdfTexCompileQueue = run.catch(() => undefined);
+  return run;
+};
+
+const ensureWasmLatexEngineReady = async () => {
+  if (WASM_MODULE) return true;
+  const g = getBrowserGlobal();
+  if (g.SwiftLaTeX && typeof g.SwiftLaTeX.compile === 'function') return true;
+  const engine = await getOrLoadPdfTexEngine();
+  return !!engine;
+};
+
 // Lazy-load and compile LaTeX to PDF in-browser using a WASM engine
 const isWasmLatexEngineConfigured = () => {
   if (WASM_MODULE) return true;
-  const g = typeof window !== 'undefined' ? window : {};
-  return !!(g.SwiftLaTeX && typeof g.SwiftLaTeX.compile === 'function');
+  const g = getBrowserGlobal();
+  return !!(g.PdfTeXEngine || (g.SwiftLaTeX && typeof g.SwiftLaTeX.compile === 'function'));
 };
 
 const compileWithWasmLatex = async (latex) => {
@@ -902,7 +964,25 @@ const compileWithWasmLatex = async (latex) => {
     }
   }
 
-  const g = typeof window !== 'undefined' ? window : {};
+  const g = getBrowserGlobal();
+
+  if (g.PdfTeXEngine) {
+    return enqueuePdfTexCompile(async () => {
+      const engine = await getOrLoadPdfTexEngine();
+      if (!engine) throw new Error('PdfTeX engine is unavailable.');
+      await waitForPdfTexReady(engine);
+      engine.writeMemFSFile('main.tex', latex);
+      engine.setEngineMainFile('main.tex');
+      const r = await engine.compileLaTeX();
+      if (r.pdf) {
+        const blob = toBlob(r.pdf);
+        if (!blob) throw new Error('Unsupported WASM engine output format');
+        return blob;
+      }
+      throw new Error(r.log || 'Compilation failed');
+    });
+  }
+
   if (g.SwiftLaTeX && typeof g.SwiftLaTeX.compile === 'function') {
     const out = await g.SwiftLaTeX.compile(latex);
     const blob = toBlob(out);
@@ -922,5 +1002,6 @@ export {
   htmlToLatex,
   summarizeLatexLog,
   isWasmLatexEngineConfigured,
+  ensureWasmLatexEngineReady,
   compileWithWasmLatex,
 };

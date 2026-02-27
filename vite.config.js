@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    base: process.env.BASE_PATH || '/',
+    base: process.env.BASE_PATH || './',
     plugins: [react()],
     server: {
       proxy,
