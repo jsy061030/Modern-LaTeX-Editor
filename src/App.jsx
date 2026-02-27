@@ -12,7 +12,6 @@ import {
   Superscript, Subscript, FunctionSquare, FileUp, Save, ImagePlus, RotateCw
 } from 'lucide-react';
 import RibbonToolbar from './features/Toolbar/RibbonToolbar';
-import DropdownMenu from './features/Toolbar/DropdownMenu';
 import {
   escapeLatex,
   unescapeLatex,
@@ -104,14 +103,6 @@ export default function LiveLatexEditor() {
   const pdfLastCodeRef = useRef('');
   const pdfReqIdRef = useRef(0);
   const pdfDebounceRef = useRef(null);
-
-  const docName = (() => {
-    const fromPath = (activeFilePath || '').split('/').pop();
-    if (fromPath) return fromPath;
-    const fromHandle = activeFileHandle?.name;
-    if (fromHandle) return fromHandle;
-    return 'Untitled';
-  })();
 
   const focusMathInput = (el) => {
     if (!el) return;
@@ -2598,59 +2589,12 @@ export default function LiveLatexEditor() {
     <div className="flex flex-col h-screen bg-slate-50 font-sans text-slate-800">
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-2 bg-white border-b border-slate-200 shadow-sm z-20">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="bg-blue-600 p-1.5 rounded-lg text-white flex-shrink-0">
-            <NotebookPen size={22} />
+        <div className="flex items-center gap-3">
+          <div className="bg-blue-600 p-1.5 rounded-lg text-white">
+            <NotebookPen size={24} />
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <h1 className="font-semibold text-[15px] leading-tight truncate">{docName}</h1>
-              {saving && <span className="text-[11px] text-slate-500">Saving…</span>}
-            </div>
-            <div className="mt-0.5 flex items-center gap-1">
-              <DropdownMenu
-                label="File"
-                ariaLabel="File menu"
-                items={[
-                  {
-                    key: 'open',
-                    label: 'Open…',
-                    subtle: 'Open a .tex/.txt file',
-                    icon: FileUp,
-                    onSelect: openFile,
-                  },
-                  {
-                    key: 'save',
-                    label: saving ? 'Saving…' : 'Save',
-                    subtle: activeFileHandle ? (activeFilePath ? `Save ${activeFilePath}` : 'Save current file') : 'Download as .tex',
-                    icon: Save,
-                    disabled: saving,
-                    onSelect: saveCurrentFile,
-                  },
-                  { type: 'separator' },
-                  {
-                    key: 'export-pdf',
-                    label: exporting ? 'Exporting…' : 'Export PDF',
-                    subtle: 'Compile LaTeX and download PDF',
-                    icon: Download,
-                    disabled: exporting,
-                    onSelect: exportAsPDF,
-                  },
-                  {
-                    key: 'logs',
-                    label: 'Logs',
-                    subtle:
-                      compileStatus === 'error'
-                        ? compileSummary || 'Compiler error'
-                        : compileStatus === 'checking'
-                          ? 'Checking…'
-                          : compileSummary || 'Show compiler log',
-                    icon: FileText,
-                    onSelect: showCompileLog,
-                  },
-                ]}
-              />
-            </div>
+          <div>
+            <h1 className="font-bold text-lg leading-tight">Modern LaTex</h1>
           </div>
         </div>
 
@@ -2665,8 +2609,8 @@ export default function LiveLatexEditor() {
               <button
                 key={key}
                 onClick={() => setActiveTab(key)}
-                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
-                  activeTab === key ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-800'
+                className={`px-3 py-1 text-xs uppercase font-bold tracking-wide rounded-md transition-all ${
+                  activeTab === key ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
                 {label}
@@ -2675,7 +2619,7 @@ export default function LiveLatexEditor() {
           </div>
 
           {activeTab === 'both' && (
-            <div className="hidden sm:flex items-center gap-1 bg-slate-100 p-1 rounded-lg" aria-label="Preview mode">
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg" aria-label="Preview mode">
               {[
                 { key: 'visual', label: 'Visual' },
                 { key: 'pdf', label: 'PDF' },
@@ -2683,8 +2627,8 @@ export default function LiveLatexEditor() {
                 <button
                   key={key}
                   onClick={() => setSplitPreviewMode(key)}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
-                    splitPreviewMode === key ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-800'
+                  className={`px-3 py-1 text-xs uppercase font-bold tracking-wide rounded-md transition-all ${
+                    splitPreviewMode === key ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
                   {label}
@@ -2694,30 +2638,43 @@ export default function LiveLatexEditor() {
           )}
         </div>
 
+        
+        <div className="flex items-center gap-2">
+          <button
+            onClick={openFile}
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors text-xs font-medium border border-slate-200"
+            title="Open .tex/.txt file"
+          >
+            <FileUp size={14} /> Open File
+          </button>
+
+          <button
+            onClick={saveCurrentFile}
+            disabled={saving}
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors text-xs font-medium border border-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={activeFileHandle ? (activeFilePath ? `Save ${activeFilePath}` : 'Save') : 'Download .tex'}
+          >
+            <Save size={14} /> {saving ? 'Saving…' : 'Save'}
+          </button>
+
+          <button
+            onClick={showCompileLog}
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors text-xs font-medium border border-slate-200"
+            title={compileStatus === 'error' ? (compileSummary || 'Compiler error') : (compileStatus === 'checking' ? 'Checking…' : (compileSummary || 'Show LaTeX compiler log'))}
+          >
+            <span className={`w-2 h-2 rounded-full ${compileStatus === 'checking' ? 'bg-amber-400 animate-pulse' : compileStatus === 'error' ? 'bg-red-500' : compileStatus === 'success' ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
+            <FileText size={14} /> Logs
+          </button>
+
         <button
-          onClick={showCompileLog}
-          className="hidden md:flex items-center gap-2 px-2.5 py-1 bg-slate-50 text-slate-700 rounded-md hover:bg-slate-100 transition-colors text-xs font-medium border border-slate-200"
-          title={
-            compileStatus === 'error'
-              ? compileSummary || 'Compiler error'
-              : compileStatus === 'checking'
-                ? 'Checking…'
-                : compileSummary || 'Show LaTeX compiler log'
-          }
+          onClick={exportAsPDF}
+          className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={exporting}
+          title={exporting ? 'Compiling…' : 'Export LaTeX to PDF'}
         >
-          <span
-            className={`w-2 h-2 rounded-full ${
-              compileStatus === 'checking'
-                ? 'bg-amber-400 animate-pulse'
-                : compileStatus === 'error'
-                  ? 'bg-red-500'
-                  : compileStatus === 'success'
-                    ? 'bg-emerald-500'
-                    : 'bg-slate-300'
-            }`}
-          />
-          Status
+          <Download size={14} /> {exporting ? 'Compiling…' : 'Export PDF'}
         </button>
+        </div>
       </header>
 
       {/* Main Content */}
