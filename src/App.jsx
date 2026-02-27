@@ -22,7 +22,6 @@ import {
   htmlToLatex,
   summarizeLatexLog,
   isWasmLatexEngineConfigured,
-  ensureWasmLatexEngineReady,
   compileWithWasmLatex,
 } from './lib/latex';
 import { sanitizeEditorHtml, maybeSanitizeEditorHtml } from './lib/sanitize';
@@ -87,7 +86,6 @@ export default function LiveLatexEditor() {
   const [imageOverlayRect, setImageOverlayRect] = useState(null);
   const lintTimer = useRef(null);
   const lintReqId = useRef(0);
-  const wasmPrewarmStartedRef = useRef(false);
   const katexLinkRef = useRef(null);
   const katexScriptRef = useRef(null);
   const katexLinkInserted = useRef(false);
@@ -2080,26 +2078,6 @@ export default function LiveLatexEditor() {
       if (lintTimer.current) clearTimeout(lintTimer.current);
     };
   }, [latexCode]);
-
-  useEffect(() => {
-    if (!USE_WASM_LATEX) return;
-    if (wasmPrewarmStartedRef.current) return;
-    wasmPrewarmStartedRef.current = true;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        await ensureWasmLatexEngineReady();
-      } catch (e) {
-        if (cancelled) return;
-        console.warn('WASM engine prewarm failed:', e);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Compile LaTeX remotely and show compiler diagnostics/log
   const showCompileLog = async () => {
