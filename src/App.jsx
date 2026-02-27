@@ -33,6 +33,8 @@ import { pickTexFile, readFileText, writeFileText, isOpenFilePickerSupported } f
 // Enable when the env var is the string 'true'.
 const ENABLE_RTEX = import.meta.env.VITE_ENABLE_RTEX === 'true';
 const USE_WASM_LATEX = import.meta.env.VITE_USE_WASM_LATEX === 'true';
+const ENABLE_PDF_VIEW = false;
+const SHOW_STATUS_BUTTON = false;
 
 export default function LiveLatexEditor() {
   const [latexCode, setLatexCode] = useState(DEFAULT_LATEX);
@@ -110,6 +112,12 @@ export default function LiveLatexEditor() {
     if (fromHandle) return fromHandle;
     return 'Untitled';
   })();
+
+  useEffect(() => {
+    if (ENABLE_PDF_VIEW) return;
+    if (activeTab === 'pdf') setActiveTab('both');
+    if (splitPreviewMode === 'pdf') setSplitPreviewMode('visual');
+  }, [activeTab, splitPreviewMode]);
 
   const focusMathInput = (el) => {
     if (!el) return;
@@ -2148,7 +2156,7 @@ export default function LiveLatexEditor() {
   };
 
   const isPdfPreviewVisible =
-    activeTab === 'pdf' || (activeTab === 'both' && splitPreviewMode === 'pdf');
+    ENABLE_PDF_VIEW && (activeTab === 'pdf' || (activeTab === 'both' && splitPreviewMode === 'pdf'));
 
 	  const normalizeLatexForPdfPreview = (input) => {
 	    let out = String(input || '');
@@ -2638,7 +2646,7 @@ export default function LiveLatexEditor() {
               { key: 'latex', label: 'Source' },
               { key: 'both', label: 'Split' },
               { key: 'visual', label: 'Visual' },
-              { key: 'pdf', label: 'PDF' },
+              ...(ENABLE_PDF_VIEW ? [{ key: 'pdf', label: 'PDF' }] : []),
             ].map(({ key, label }) => (
               <button
                 key={key}
@@ -2652,11 +2660,11 @@ export default function LiveLatexEditor() {
             ))}
           </div>
 
-          {activeTab === 'both' && (
+          {activeTab === 'both' && ENABLE_PDF_VIEW && (
             <div className="hidden sm:flex items-center gap-1 bg-slate-100 p-1 rounded-lg" aria-label="Preview mode">
               {[
                 { key: 'visual', label: 'Visual' },
-                { key: 'pdf', label: 'PDF' },
+                ...(ENABLE_PDF_VIEW ? [{ key: 'pdf', label: 'PDF' }] : []),
               ].map(({ key, label }) => (
                 <button
                   key={key}
@@ -2672,30 +2680,32 @@ export default function LiveLatexEditor() {
           )}
         </div>
 
-        <button
-          onClick={showCompileLog}
-          className="hidden md:flex items-center gap-2 px-2.5 py-1 bg-slate-50 text-slate-700 rounded-md hover:bg-slate-100 transition-colors text-xs font-medium border border-slate-200"
-          title={
-            compileStatus === 'error'
-              ? compileSummary || 'Compiler error'
-              : compileStatus === 'checking'
-                ? 'Checking…'
-                : compileSummary || 'Show LaTeX compiler log'
-          }
-        >
-          <span
-            className={`w-2 h-2 rounded-full ${
-              compileStatus === 'checking'
-                ? 'bg-amber-400 animate-pulse'
-                : compileStatus === 'error'
-                  ? 'bg-red-500'
-                  : compileStatus === 'success'
-                    ? 'bg-emerald-500'
-                    : 'bg-slate-300'
-            }`}
-          />
-          Status
-        </button>
+        {SHOW_STATUS_BUTTON && (
+          <button
+            onClick={showCompileLog}
+            className="hidden md:flex items-center gap-2 px-2.5 py-1 bg-slate-50 text-slate-700 rounded-md hover:bg-slate-100 transition-colors text-xs font-medium border border-slate-200"
+            title={
+              compileStatus === 'error'
+                ? compileSummary || 'Compiler error'
+                : compileStatus === 'checking'
+                  ? 'Checking…'
+                  : compileSummary || 'Show LaTeX compiler log'
+            }
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                compileStatus === 'checking'
+                  ? 'bg-amber-400 animate-pulse'
+                  : compileStatus === 'error'
+                    ? 'bg-red-500'
+                    : compileStatus === 'success'
+                      ? 'bg-emerald-500'
+                      : 'bg-slate-300'
+              }`}
+            />
+            Status
+          </button>
+        )}
       </header>
 
       {/* Main Content */}
@@ -2820,7 +2830,7 @@ export default function LiveLatexEditor() {
         )}
 
         {/* RIGHT: PDF */}
-        {(activeTab === 'pdf' || (activeTab === 'both' && splitPreviewMode === 'pdf')) && (
+        {ENABLE_PDF_VIEW && (activeTab === 'pdf' || (activeTab === 'both' && splitPreviewMode === 'pdf')) && (
           <div
             className={`flex flex-col bg-white ${activeTab === 'both' ? 'flex-shrink-0 min-w-0' : 'w-full'}`}
             style={activeTab === 'both' ? { flexBasis: `${100 - splitPct}%` } : undefined}
