@@ -1,0 +1,64 @@
+name: 'Publish Tauri App'
+
+on:
+  push:
+    tags:
+      - 'v*'  # 当你推送 v1.0.0 这样的标签时触发
+  workflow_dispatch:  # 允许手动在 GitHub 页面上点按钮触发
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Mac ARM (M1/M2/M3)
+          - platform: 'macos-latest'
+            args: '--target aarch64-apple-darwin'
+          # Mac Intel (老电脑)
+          - platform: 'macos-latest'
+            args: '--target x86_64-apple-darwin'
+          # Linux x64
+          - platform: 'ubuntu-latest'
+            args: ''
+          # Windows x64
+          - platform: 'windows-latest'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 只在 Linux 上安装系统依赖（WebKit）
+      - name: Install Linux Dependencies
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libgtk-3-dev libappindicator3-dev
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # 在 Mac 上同时装 Intel 和 ARM 工具链
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      # 核心步骤：构建并发布
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: 'App v__VERSION__'
+          args: ${{ matrix.args }}
